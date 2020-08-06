@@ -26,6 +26,9 @@
 #include <string.h>
 #include <errno.h>
 
+#include <sys/socket.h>
+#include <sys/un.h>
+
 #ifndef D
 #  define  D(...)   do{}while(0)
 #endif
@@ -90,7 +93,19 @@ qemu_pipe_open(const char*  pipeName)
 
     snprintf(buff, sizeof buff, "pipe:%s", pipeName);
 
-    fd = TEMP_FAILURE_RETRY(open("/dev/qemu_pipe", O_RDWR));
+//    fd = TEMP_FAILURE_RETRY(open("/dev/qemu_pipe", O_RDWR));
+    fd = socket(AF_LOCAL, SOCK_STREAM, 0);
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, "/dev/qemu_pipe", sizeof(addr.sun_path));
+
+    if (connect(fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+        close(fd);
+        fd = -1;
+    }
+
     if (fd < 0 && errno == ENOENT)
         fd = TEMP_FAILURE_RETRY(open("/dev/goldfish_pipe", O_RDWR));
     if (fd < 0) {
